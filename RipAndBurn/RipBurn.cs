@@ -20,7 +20,6 @@ namespace RipAndBurn
     {
 
         private CDRipper _cdRip;
-        private CDhttp _cdMetaInfo = new CDhttp();
 
         private ManagementEventWatcher _watcher;
 
@@ -68,25 +67,25 @@ namespace RipAndBurn
         // EVENTS **************************************************************
 
         async private void watcher_EventArrived_CD_Door(object sender, EventArrivedEventArgs e) {
-            foreach (DriveInfo drive in DriveInfo.GetDrives().Where(d => d.DriveType == DriveType.CDRom))
-                if (drive.Name == "D:\\") {
-                    if (drive.IsReady == true) {
-                        this._watcher.Stop();
-                        Action<int> startPbar = (total) => {
-                            this.StartProgBar(total);
-                            this.progressLabel.Text = "Fetching CD info...";
-                            this.outLabel.Text = "I notice there is a CD I will start copying it";
-                        };
-                        this.progressBar1.Invoke(startPbar, 12);
+            foreach (DriveInfo drive in DriveInfo.GetDrives().Where(d => d.DriveType == DriveType.CDRom)) {
+                if (drive.IsReady == true) {
+                    this._watcher.Stop();
+                    Action<int> startPbar = (total) => {
+                        this.StartProgBar(total);
+                        this.progressLabel.Text = "Fetching CD info...";
+                        this.outLabel.Text = "I notice there is a CD I will start copying it";
+                    };
+                    this.progressBar1.Invoke(startPbar, 12);
 
-                        this._cdMetaInfo.GetCD_Id(drive.Name, this);
-                        await this._cdMetaInfo.GetReleaseData(this);
-                        await this._cdRip.RipCDtoTemp(this._cdMetaInfo.CDRom, this);
-                    }
-                    else {
-                        Console.Error.WriteLine("Error");
-                    }
+                    string query = this._cdRip.GetCD_Id(drive.Name, this);
+                    await this._cdRip.GetReleaseData(this, query);
+                    char dChar = drive.Name.ToCharArray(0, 1)[0];
+                    await this._cdRip.RipCDtoTemp(this._cdRip.CDRom, dChar, this);
                 }
+                else {
+                    Console.Error.WriteLine("Error");
+                }
+            }
         }
         // Closes Form
         private void ripper_onFormClose(object sender, FormClosingEventArgs e)

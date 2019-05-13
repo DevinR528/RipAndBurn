@@ -19,7 +19,6 @@ namespace RipAndBurn.Rip.CDMetadata.CDInfo {
     public class CurrentCD {
         public string Title { get; set; }
         public string Artist { get; set; }
-
         public long? TotalLen { get; set; }
         public List<SingleTrack> Tracks { get; set; }
 

@@ -41,7 +41,8 @@ namespace RipAndBurn.Rip
             
         }
 
-        public int GetCD_Id(string drive, RipBurn ripperForm) {
+        // sets 
+        public string GetCD_Id(string drive, RipBurn ripperForm) {
             this._update = (amt) => ripperForm.progressBar1.Value += amt;
 
             ripperForm.progressBar1.Invoke(this._update, 2);
@@ -52,8 +53,7 @@ namespace RipAndBurn.Rip
                     ripperForm.progressBar1.Invoke(this._update, 2);
                     string[] queryArr = queryRaw.Split('?', '=', '&');
                     string query = $"{queryArr[2]}?{queryArr[5]}={queryArr[6]}";
-                    this._discID = query;
-                    return 0;
+                    return query;
                 }
             }
             catch (DiscIdException ex) {
