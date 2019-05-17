@@ -43,5 +43,9 @@ namespace RipAndBurn {
                 }
             }
         }
+
+        private void CancelButton_Click(object sender, EventArgs e) {
+
+        }
     }
 }
