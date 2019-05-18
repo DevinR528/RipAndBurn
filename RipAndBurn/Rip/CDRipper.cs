@@ -36,6 +36,8 @@ namespace RipAndBurn.Rip
 
         private WavLib.WaveWriter wavWriter;
 
+        private Stream[] _mem_streams;
+
         private InputBox _iBox;
         private RipBurn _form;
         public CurrentCD CDRom {
@@ -88,7 +90,7 @@ namespace RipAndBurn.Rip
             }
         }
 
-        async public Task GetReleaseData(string diskQuery) {
+        async public Task Get_CD_meta(string diskQuery) {
 
             this._form.progressBar1.Invoke(this._update, 2);
             try {
@@ -111,11 +113,17 @@ namespace RipAndBurn.Rip
                                 if (metaInfo.Sectors == r.Sectors) {
                                     if (rels.Id != null) {
                                         // check title
-                                        this._iBox = new InputBox(rels.Media);
-                                        DialogResult dRes = this._iBox.ShowDialog();
-                                        string title = this._iBox.GetTitle();
+                                        //this._iBox = new InputBox(rels.Media);
+                                        //DialogResult dRes = this._iBox.ShowDialog();
 
-                                        if (dRes == DialogResult.OK) {
+                                        string title = "";
+                                        if (rels.Title != null) {
+                                            title = rels.Title;
+                                        } else if (media.Title != null) {
+                                            title = media.Title;
+                                        }
+
+                                        if (title != "") {
                                             string id = rels.Id.ToString();
                                             HttpResponseMessage res2 = await client.GetAsync($"https://musicbrainz.org/ws/2/release/{id}?inc=artist-credits+recordings&fmt=json");
                                             HttpContent resBuff2 = res2.Content;
@@ -125,37 +133,31 @@ namespace RipAndBurn.Rip
                                             TrackList albums = TrackList.FromJson(content);
 
                                             foreach (CDMetadata.Album.Media album in albums.Media
-                                                .Where((album) => album.Title == title))
-                                            {
+                                                .Where((album) => album.TrackCount == media.TrackCount)) {
 
                                                 this._form.progressBar1.Invoke(this._update, 2);
                                                 // set fields we care about
-                                                this._intrnCurrentCD = CurrentCD.FromMeta(album);
+                                                this._intrnCurrentCD = CurrentCD.FromMeta(album, title);
 
                                                 this._form.Invoke((Action)(() => {
                                                     this._form.progressLabel.Text = "Finised collecting CD info";
                                                 }));
-                                                this.IBox.Dispose();
                                                 return;
                                             }
                                         }
                                         else {
                                             // Cancel hit
+                                            this._form.isRipping = false;
                                             return;
                                         }
-                                    } else {
-                                        // cant find info so continue on
-                                        MessageBox.Show("Can not find a CD that matches the one inserted");
-                                        return;
                                     }
-                                } else {
-                                    // no matching ids 
-                                    MessageBox.Show("Can not find a CD that matches the one inserted");
-                                    return;
                                 }
                             }
                         }
                     }
+                    // no matching ids 
+                    MessageBox.Show("Can not find a CD that matches the one inserted, we'll burn without song names.");
+                    return;
                 } else {
                     // status not 200
                     MessageBox.Show("Probably not connected to the internet, we'll burn without song names.");
@@ -163,7 +165,7 @@ namespace RipAndBurn.Rip
                 }
             }
             catch (Exception err) {
-                throw new HttpRequestException("");
+                throw new HttpRequestException("UhOh", err);
             }
         }
 
@@ -178,31 +180,34 @@ namespace RipAndBurn.Rip
                             this._form.progressBar1.Invoke((Action)(() => {
                                 this._form.progressBar1.Value = 0;
                                 this._form.progressBar1.Maximum = 100;
-                                this._form.progressLabel.Text = $"Copying CD to temp folder (1. {this._intrnCurrentCD.Tracks[0].Name})";
+                                string song = this._intrnCurrentCD == null ? "" : this._intrnCurrentCD.Tracks[0].Name + " ";
+                                this._form.progressLabel.Text = $"Copying track (1. {song}) to Music";
                             }));
+
                             for (int i = 1; i <= trks; i++) {
 
+                                string name = string.Format("tmp\\track{0:00}.raw", i);
+                                Stream file_st = new FileStream(name, FileMode.Create, FileAccess.Write);
                                 WavLib.WaveFormat format = new WavLib.WaveFormat(44100, 16, 2);
-                                string name = string.Format("test\\track{0:00}.raw", i);
 
-                                Stream fileStrm = new FileStream(name, FileMode.Create, FileAccess.Write);
                                 try {
-                                    // this writes the cd data to the file stream object
-                                    this.wavWriter = new WavLib.WaveWriter(fileStrm, format, this.driver.TrackSize(i));
+                                    // this writes the cd data to the stream object
+                                    this.wavWriter = new WavLib.WaveWriter(file_st, format, this.driver.TrackSize(i));
                                     // drives reading of cd data
-                                    if (this.driver.ReadTrack(i, new CdDataReadEventHandler(WriteWaveData), new CdReadProgressEventHandler(CdReadProgress)) > 0) {
-
-                                    }
-                                } catch {
-                                    throw new IOException("Write failed");
+                                    this.driver.ReadTrack(i,
+                                        new CdDataReadEventHandler(WriteWaveData),
+                                        new CdReadProgressEventHandler(CdReadProgress));
+                                }
+                                catch (Exception err) {
+                                    throw new IOException("Write failed", err);
                                 } finally {
-                                    fileStrm.Close();
+                                    file_st.Close();
                                 }
                             }
                             // encode files !!!!!!!!!!!!!!!
                             await this.EncodeFolderMp3();
-                        } catch {
-                            throw new IOException("IO Stream failed");
+                        } catch(Exception e) {
+                            throw new IOException("IO Stream failed", e);
                         }
                         finally {
                             this.driver.UnLockCD();
@@ -211,7 +216,13 @@ namespace RipAndBurn.Rip
                 }
             } else {
                 // drive could not be read
-                MessageBox.Show("Could not read media try another CD, I'm not sure if a DVD will work but try.");
+                MessageBox.Show("Could not read media try another CD, I'm not sure if a DVD will work.");
+            }
+        }
+
+        private void WriteWaveData(object sender, DataReadEventArgs ea) {
+            if (this.wavWriter != null) {
+                this.wavWriter.Write(ea.Data, 0, (int)ea.DataSize);
             }
         }
 
@@ -225,18 +236,52 @@ namespace RipAndBurn.Rip
                     if (this._trackNum < this._intrnCurrentCD.Tracks.Count) {
                         this._form.progressBar1.Value = 0;
                         this._form.progressBar1.Maximum = 100;
-                        string song = this._intrnCurrentCD.Tracks[this._trackNum].Name;
-                        this._form.progressLabel.Text = $"Copying {this._trackNum + 1}. {song} to temp folder";
+                        string song = this._intrnCurrentCD == null ? "" : this._intrnCurrentCD.Tracks[this._trackNum].Name + " ";
+                        this._form.progressLabel.Text = $"Copying track ({this._trackNum}. {song}) to Music";
                         this._trackNum++;
                     }
                 }));
             }
         }
 
+        async private Task EncodeStreamMp3(Stream src, WaveFormat fmt, string saveDir, int trkNum) {
+            ID3TagData tag = null;
+            if (this._intrnCurrentCD != null) {
+                tag = new ID3TagData {
+                    Artist = this._intrnCurrentCD.Artist,
+                    Album = this._intrnCurrentCD.Title,
+                    Title = this._intrnCurrentCD.Tracks[trkNum].Name,
+                    Track = (trkNum + 1).ToString(),
+                };
+            }
 
-        public void WriteWaveData(object sender, DataReadEventArgs ea) {
-            if (this.wavWriter != null) {
-                this.wavWriter.Write(ea.Data, 0, (int)ea.DataSize);
+            string title = tag == null ? string.Format("track{0:00}.mp3", trkNum) : tag.Title;
+            string path = $"{saveDir}\\{title}.mp3";
+
+            using (RawSourceWaveStream audio_in = new RawSourceWaveStream(src, fmt))
+            using (LameMP3FileWriter audio_out = new LameMP3FileWriter(path, audio_in.WaveFormat, LAMEPreset.V3, tag)) {
+                audio_out.MinProgressTime = 250;
+                this._totalInput += audio_in.Length;
+                this._form.progressBar1.Invoke((Action)(() => {
+                    this._form.progressBar1.Value = 0;
+                    this._form.progressBar1.Maximum = (int)this._totalInput;
+                }));
+                audio_out.OnProgress += ((object writer, long inputBytes, long outputBytes, bool finished) => {
+                    if (finished) {
+                        this._form.progressBar1.Invoke((Action)(() => {
+                            this._form.progressLabel.Text = $"All set now we can start burning";
+                            this._form.progressBar1.Value = this._form.progressBar1.Maximum;
+                        }));
+                    }
+                    else {
+                        this._form.progressBar1.Invoke((Action<int>)((amt) => {
+                            this._form.progressLabel.Text = $"Converting ({title}) to MP3";
+                            this._form.progressBar1.Increment(amt);
+                        }), (int)inputBytes);
+                    }
+                });
+                await audio_in.CopyToAsync(audio_out);
+                src.Close();
             }
         }
 
@@ -244,11 +289,12 @@ namespace RipAndBurn.Rip
         async private Task EncodeFolderMp3 () {
             string homeDir = Environment.GetEnvironmentVariable("%HOMEDRIVE%%HOMEPATH%");
             string music_path = Path.GetFullPath("Music");
-            DialogResult dr = MessageBox.Show("Save to default Music folder", "Save Folder", MessageBoxButtons.YesNo);
+            //DialogResult dr = MessageBox.Show("Save to default Music folder", "Save Folder", MessageBoxButtons.YesNo);
 
             string saveLoc = "";
-            if (dr == DialogResult.Yes) {
-                saveLoc = Path.GetFullPath("Music");
+            if (true/*dr == DialogResult.Yes*/) {
+                // CHANGE FOR REL
+                saveLoc = Path.GetFullPath("test");
             } else {
                 this._form.Invoke((Action)(() => {
                     this._form.folderBrowserDialog1.RootFolder = Environment.SpecialFolder.Desktop;
@@ -287,9 +333,9 @@ namespace RipAndBurn.Rip
             }
             string title = tag == null ? Path.GetFileNameWithoutExtension(trkLoca) : tag.Title;
             string path = $"{saveDir}\\{title}.mp3";
-
             using (AudioFileReader audio_in = new AudioFileReader(trkLoca))
-                //***************************                        Saved here
+
+            //***************************                        Saved here
             using (LameMP3FileWriter audio_out = new LameMP3FileWriter(path, audio_in.WaveFormat, LAMEPreset.V3, tag)) {
                 audio_out.MinProgressTime = 250;
                 this._totalInput += audio_in.Length;
@@ -303,7 +349,8 @@ namespace RipAndBurn.Rip
                             this._form.progressLabel.Text = $"All set now we can start burning";
                             this._form.progressBar1.Value = this._form.progressBar1.Maximum;
                         }));
-                    } else {
+                    }
+                    else {
                         this._form.progressBar1.Invoke((Action<int>)((amt) => {
                             this._form.progressLabel.Text = $"Converting ({title}) to MP3";
                             this._form.progressBar1.Increment(amt);

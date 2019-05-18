@@ -196,8 +196,15 @@ namespace RipAndBurn.Rip.CDMetadata.Release
             if (Int64.TryParse(value, out l))
             {
                 return l;
+            } else {
+                try {
+                    long y = Convert.ToDateTime(value).Year;
+                    return y;
+                }
+                catch {
+                    return null;
+                }
             }
-            throw new Exception("Cannot unmarshal type long");
         }
 
         public override void WriteJson(JsonWriter writer, object untypedValue, JsonSerializer serializer)

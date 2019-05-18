@@ -96,7 +96,7 @@
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Ripper\Win32Functions.cs" />
-    <Compile Include="Rip\MemoryWavStream.cs" />
+    <Compile Include="WavLib\MemoryWavStream.cs" />
     <Compile Include="WavLib\AudioWriters.cs" />
     <Compile Include="WavLib\WaveNative.cs" />
     <Compile Include="WavLib\WaveStream.cs" />

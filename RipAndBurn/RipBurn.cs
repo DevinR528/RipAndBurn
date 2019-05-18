@@ -26,6 +26,9 @@ namespace RipAndBurn
     }
     public partial class RipBurn : Form
     {
+        private bool _isBurning;
+        public bool isRipping;
+
         private string _driveName;
 
         private CDRipper _cdRip;
@@ -44,7 +47,6 @@ namespace RipAndBurn
 
             this.backgroundWorker1.WorkerReportsProgress = true;
             this.backgroundWorker1.WorkerSupportsCancellation = true;
-            this.backgroundWorker1.DoWork += new DoWorkEventHandler(burnerThread_doWork);
 
             WqlEventQuery q = new WqlEventQuery();
             q.EventClassName = "__InstanceModificationEvent";
@@ -60,7 +62,7 @@ namespace RipAndBurn
             this._watcher = new ManagementEventWatcher(scope, q);
             this._watcher.EventArrived += new EventArrivedEventHandler(watcher_EventArrived_CD_Door);
             // NEED
-            //this._watcher.Start();
+            this._watcher.Start();
         }
 
         private void ActionButton_Click(object sender, EventArgs e) {
@@ -86,6 +88,8 @@ namespace RipAndBurn
 
                         this.progressBar1.Visible = true;
                         this.progressBar1.Maximum = 100;
+
+                        this._isBurning = true;
                         this.backgroundWorker1.RunWorkerAsync(args);
                         break;
                     }
@@ -134,7 +138,6 @@ namespace RipAndBurn
 
                     case IMAPI_FORMAT2_DATA_WRITE_ACTION.IMAPI_FORMAT2_DATA_WRITE_ACTION_COMPLETED:
                         this.progressLabel.Text = "Completed!";
-                        //this._cdRip.Open();
                         break;
 
 
@@ -143,14 +146,20 @@ namespace RipAndBurn
         }
 
         private void burnerThread_onComplete(object sender, RunWorkerCompletedEventArgs e) {
+            this._isBurning = false;
             if (e.Error != null) {
-                if (e.Error is Burn.FormatException) {
+
+                if (e.Error is InvalidCastException) {
                     MessageBox.Show("CD seems to have something on it already try a new disc.");
-                }
-                if (e.Error is Burn.BurnException) {
+                } else {
                     MessageBox.Show("We had a problem writing to the disc, unfortunately you may have to start over.");
                 }
+            } else {
+                this.outLabel.Text = "You did it Rip and Burn Completed !!!!";
+                this._cdRip.Open();
             }
+            this.progressBar1.Visible = false;
+            this.progressLabel.Text = "";
         }
 
         private void CancelButton_Click(object sender, EventArgs e) {
@@ -164,6 +173,8 @@ namespace RipAndBurn
             foreach (DriveInfo drive in DriveInfo.GetDrives().Where(d => d.DriveType == DriveType.CDRom)) {
                 if (drive.IsReady == true) {
                     this._driveName = drive.Name;
+
+                    this.isRipping = true;
                     this._watcher.Stop();
                     Action<int> startPbar = (total) => {
                         this.StartProgBar(total);
@@ -171,19 +182,26 @@ namespace RipAndBurn
                         this.outLabel.Text = "I notice there is a CD I will start copying it";
                     };
                     this.progressBar1.Invoke(startPbar, 12);
-
-                    string query = this._cdRip.GetCD_Id(this._driveName, this);
+                    
                     try {
-                        await this._cdRip.GetReleaseData(query);
+                        string query = this._cdRip.GetCD_Id(this._driveName, this);
+
+                        await this._cdRip.Get_CD_meta(query);
                         char dChar = drive.Name.ToCharArray(0, 1)[0];
+
                         await this._cdRip.RipCDtoTemp(dChar);
+                        //stop watcher until burn is complete
                         this._watcher.Stop();
+                        this.isRipping = false;
                     } catch (IOException err) {
                         MessageBox.Show("Something went wrong with the Ripping of the CD try again." 
                             + err.ToString());
                     } catch (HttpRequestException err) {
                         MessageBox.Show("Something went wrong, check your internet connection."
                             + err.ToString());
+                    } catch(DiscId.DiscIdException dex) {
+                        MessageBox.Show("Something went wrong, this disc can not be read."
+                            + dex.ToString());
                     }
                     // READY TO BURN
                     this._cdRip.Open();

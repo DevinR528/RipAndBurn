@@ -24,9 +24,9 @@ namespace RipAndBurn.Rip.CDMetadata.CDInfo {
 
         public CurrentCD() { }
 
-        public static CurrentCD FromMeta(CDMetadata.Album.Media album) {
+        public static CurrentCD FromMeta(CDMetadata.Album.Media album, string title) {
             CurrentCD storedCd = new CurrentCD {
-                Title = album.Title,
+                Title = album.Title != "" ? album.Title : title,
                 Artist = album.Tracks[0].ArtistCredit[0].Name,
                 Tracks = new List<SingleTrack>(),
             };

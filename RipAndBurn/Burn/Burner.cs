@@ -95,7 +95,7 @@ namespace RipAndBurn.Burn {
                         }
                     }
                     catch (Exception err) {
-                        throw new FormatException("Unable to create image on media", err);
+                        throw new FormatException("Unable to create image on media");
                     } finally {
                         if (this._cdFormat != null) {
                             Marshal.ReleaseComObject(this._cdFormat);
@@ -179,9 +179,6 @@ namespace RipAndBurn.Burn {
                 var fileInfo = new FileInfo(currentFile);
                 this._bData.statusMessage = $"Adding {fileInfo.Name} to disc";
 
-                //
-                // report back to the ui
-                //
                 this._bData.task = BURN_MEDIA_TASK.BURN_MEDIA_TASK_FILE_SYSTEM;
                 this._form.backgroundWorker1.ReportProgress(percentProgress, this._bData);
             }
