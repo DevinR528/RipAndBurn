@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -11,9 +12,13 @@ namespace RipAndBurn.Rip.CDMetadata.CDInfo {
         public long? ByteLen { get; set; }
 
         public SingleTrack(Album.Track trk) {
-            this.Name = trk.Title;
+            this.Name = this.CleanInvalidFile(trk.Title);
             this.Number = trk.Position;
             this.ByteLen = trk.Length;
+        }
+
+        private string CleanInvalidFile(string file) {
+            return string.Join("_", file.Split(Path.GetInvalidFileNameChars()));
         }
     }
     public class CurrentCD {

@@ -28,14 +28,13 @@
         /// </summary>
         private void InitializeComponent()
         {
+            System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(RipBurn));
             this.actionButton = new System.Windows.Forms.Button();
             this.outLabel = new System.Windows.Forms.Label();
             this.saveFileDialog1 = new System.Windows.Forms.SaveFileDialog();
             this.progressBar1 = new System.Windows.Forms.ProgressBar();
             this.burnButton = new System.Windows.Forms.Button();
             this.progressLabel = new System.Windows.Forms.Label();
-            this.cancelButton = new System.Windows.Forms.Button();
-            this.label2 = new System.Windows.Forms.Label();
             this.backgroundWorker1 = new System.ComponentModel.BackgroundWorker();
             this.folderBrowserDialog1 = new System.Windows.Forms.FolderBrowserDialog();
             this.SuspendLayout();
@@ -86,25 +85,6 @@
             this.progressLabel.TabIndex = 4;
             this.progressLabel.Text = "label1";
             // 
-            // cancelButton
-            // 
-            this.cancelButton.Location = new System.Drawing.Point(28, 237);
-            this.cancelButton.Name = "cancelButton";
-            this.cancelButton.Size = new System.Drawing.Size(71, 28);
-            this.cancelButton.TabIndex = 5;
-            this.cancelButton.Text = "Cancel";
-            this.cancelButton.UseVisualStyleBackColor = true;
-            this.cancelButton.Click += new System.EventHandler(this.CancelButton_Click);
-            // 
-            // label2
-            // 
-            this.label2.AutoSize = true;
-            this.label2.Location = new System.Drawing.Point(25, 217);
-            this.label2.Name = "label2";
-            this.label2.Size = new System.Drawing.Size(98, 13);
-            this.label2.TabIndex = 6;
-            this.label2.Text = "Cancel at any point";
-            // 
             // backgroundWorker1
             // 
             this.backgroundWorker1.DoWork += new System.ComponentModel.DoWorkEventHandler(this.burnerThread_doWork);
@@ -117,13 +97,12 @@
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(536, 297);
-            this.Controls.Add(this.label2);
-            this.Controls.Add(this.cancelButton);
             this.Controls.Add(this.progressLabel);
             this.Controls.Add(this.burnButton);
             this.Controls.Add(this.progressBar1);
             this.Controls.Add(this.outLabel);
             this.Controls.Add(this.actionButton);
+            this.Icon = ((System.Drawing.Icon)(resources.GetObject("$this.Icon")));
             this.Name = "RipBurn";
             this.Text = "Rip and Burn a CD Grandpa!";
             this.FormClosing += new System.Windows.Forms.FormClosingEventHandler(this.ripper_onFormClose);
@@ -136,15 +115,13 @@
         #endregion
 
         private System.Windows.Forms.Button actionButton;
-        private System.Windows.Forms.Label outLabel;
         private System.Windows.Forms.Button burnButton;
-        private System.Windows.Forms.Button cancelButton;
-        private System.Windows.Forms.Label label2;
         public System.Windows.Forms.ProgressBar progressBar1;
         public System.Windows.Forms.Label progressLabel;
         public System.Windows.Forms.SaveFileDialog saveFileDialog1;
         public System.ComponentModel.BackgroundWorker backgroundWorker1;
         public System.Windows.Forms.FolderBrowserDialog folderBrowserDialog1;
+        public System.Windows.Forms.Label outLabel;
     }
 }
 

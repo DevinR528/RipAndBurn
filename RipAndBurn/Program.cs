@@ -14,9 +14,18 @@ namespace RipAndBurn
         [STAThread]
         static void Main()
         {
-            Application.EnableVisualStyles();
-            Application.SetCompatibleTextRenderingDefault(false);
-            Application.Run(new RipBurn());
+            FileLogger log = new FileLogger();
+
+            try {
+                Application.EnableVisualStyles();
+                Application.SetCompatibleTextRenderingDefault(false);
+                Application.Run(new RipBurn());
+            }
+            catch (Exception err) {
+                log.Log(err);
+                Application.Exit();
+            }
+
         }
     }
 }

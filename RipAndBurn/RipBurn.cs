@@ -1,11 +1,7 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
-using System.Drawing;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using System.Windows.Forms;
 
 using System.Management;
@@ -27,7 +23,7 @@ namespace RipAndBurn
     public partial class RipBurn : Form
     {
         private bool _isBurning;
-        public bool isRipping;
+        public bool _isRipping;
 
         private string _driveName;
 
@@ -84,14 +80,18 @@ namespace RipAndBurn
                     string path = this.folderBrowserDialog1.SelectedPath;
 
                     foreach (DriveInfo drive in DriveInfo.GetDrives().Where(d => d.DriveType == DriveType.CDRom)) {
-                        Args args = new Args { drive = drive.Name, path = path };
+                        if (drive.IsReady) {
+                            Args args = new Args { drive = drive.Name, path = path };
 
-                        this.progressBar1.Visible = true;
-                        this.progressBar1.Maximum = 100;
+                            this.progressBar1.Visible = true;
+                            this.progressBar1.Maximum = 100;
 
-                        this._isBurning = true;
-                        this.backgroundWorker1.RunWorkerAsync(args);
-                        break;
+                            this._isBurning = true;
+                            this.backgroundWorker1.RunWorkerAsync(args);
+                            return;
+                        } else {
+                            MessageBox.Show("Make sure there is a blank CD in the drive.");
+                        }
                     }
                 }
             }
@@ -155,7 +155,7 @@ namespace RipAndBurn
                     MessageBox.Show("We had a problem writing to the disc, unfortunately you may have to start over.");
                 }
             } else {
-                this.outLabel.Text = "You did it Rip and Burn Completed !!!!";
+                this.outLabel.Text = "You did it, Rip and Burn Completed!!!!";
                 this._cdRip.Open();
             }
             this.progressBar1.Visible = false;
@@ -174,7 +174,7 @@ namespace RipAndBurn
                 if (drive.IsReady == true) {
                     this._driveName = drive.Name;
 
-                    this.isRipping = true;
+                    this._isRipping = true;
                     this._watcher.Stop();
                     Action<int> startPbar = (total) => {
                         this.StartProgBar(total);
@@ -184,6 +184,7 @@ namespace RipAndBurn
                     this.progressBar1.Invoke(startPbar, 12);
                     
                     try {
+                        // *************************************            clearly this is terible
                         string query = this._cdRip.GetCD_Id(this._driveName, this);
 
                         await this._cdRip.Get_CD_meta(query);
@@ -191,8 +192,7 @@ namespace RipAndBurn
 
                         await this._cdRip.RipCDtoTemp(dChar);
                         //stop watcher until burn is complete
-                        this._watcher.Stop();
-                        this.isRipping = false;
+                        this._isRipping = false;
                     } catch (IOException err) {
                         MessageBox.Show("Something went wrong with the Ripping of the CD try again." 
                             + err.ToString());
@@ -204,9 +204,10 @@ namespace RipAndBurn
                             + dex.ToString());
                     }
                     // READY TO BURN
-                    this._cdRip.Open();
+                    //this._cdRip.Open();
                 } else {
-                    MessageBox.Show("No CD found to rip.");
+                    this._watcher.Stop();
+                    MessageBox.Show("No CD found to rip. Now you must click Start button.");
                 }
             }
         }
@@ -214,6 +215,10 @@ namespace RipAndBurn
         private void ripper_onFormClose(object sender, FormClosingEventArgs e)
         {
             this._cdRip.Close();
+            if (this._isBurning || this._isRipping) {
+                e.Cancel = true;
+                // show message
+            }
         }
 
         // MINE ***************************************************************
@@ -223,12 +228,6 @@ namespace RipAndBurn
             this.progressBar1.Maximum = numSections;
             this.progressBar1.Value = 0;
             this.progressBar1.Step = 1;
-        }
-
-        private void ResetWatch_Progress() {
-            this.outLabel.Text = "Click Open or just wait if a CD with music on it is in the CD drive";
-            this._watcher.Start();
-            this.progressBar1.Visible = false;
         }
     }
 }

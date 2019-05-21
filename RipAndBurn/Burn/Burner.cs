@@ -3,10 +3,6 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
-using System.Text;
-using System.Threading.Tasks;
-
-using System.Windows.Forms;
 
 using IMAPI2.Interop;
 using IMAPI2.MediaItem;
@@ -95,7 +91,7 @@ namespace RipAndBurn.Burn {
                         }
                     }
                     catch (Exception err) {
-                        throw new FormatException("Unable to create image on media");
+                        throw new Burn.FormatException("Unable to create image on media", err);
                     } finally {
                         if (this._cdFormat != null) {
                             Marshal.ReleaseComObject(this._cdFormat);
