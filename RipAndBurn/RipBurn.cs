@@ -20,10 +20,14 @@ namespace RipAndBurn
         public string path;
         public string drive;
     }
-    public partial class RipBurn : Form
-    {
+    public partial class RipBurn : Form {
+
+        FileLogger log = new FileLogger();
+
         private bool _isBurning;
         public bool _isRipping;
+
+        public Action<string> ResetProgBar;
 
         private string _driveName;
 
@@ -34,7 +38,7 @@ namespace RipAndBurn
         public RipBurn() { InitializeComponent(); }
 
         private void Form1_Load(object sender, EventArgs e) {
-            this.outLabel.Text = "Click Open or just wait if a CD with music on it is in the CD drive";
+            this.outLabel.Text = "Click 'Start Rip' to start copying";
             this.progressLabel.Text = "";
             this.progressBar1.Visible = false;
 
@@ -42,7 +46,6 @@ namespace RipAndBurn
             this._cdRip = new CDRipper();
 
             this.backgroundWorker1.WorkerReportsProgress = true;
-            this.backgroundWorker1.WorkerSupportsCancellation = true;
 
             WqlEventQuery q = new WqlEventQuery();
             q.EventClassName = "__InstanceModificationEvent";
@@ -57,8 +60,15 @@ namespace RipAndBurn
 
             this._watcher = new ManagementEventWatcher(scope, q);
             this._watcher.EventArrived += new EventArrivedEventHandler(watcher_EventArrived_CD_Door);
+
+            this.ResetProgBar = (msg) => {
+                this.progressBar1.Value = 0;
+                this.progressBar1.Visible = false;
+                this.outLabel.Text = msg;
+                this.progressLabel.Text = "";
+            };
             // NEED
-            this._watcher.Start();
+            //this._watcher.Start();
         }
 
         private void ActionButton_Click(object sender, EventArgs e) {
@@ -69,30 +79,38 @@ namespace RipAndBurn
         private void BurnButton_Click(object sender, EventArgs e) {
             this.progressBar1.Value = 0;
             if (this._driveName != null) {
-                Args args = new Args { drive = this._driveName, path = null };
-                this.backgroundWorker1.RunWorkerAsync(args);
-            } else {
-                // change to Music after dev
-                this.folderBrowserDialog1.RootFolder = Environment.SpecialFolder.Desktop;
+                this.folderBrowserDialog1.RootFolder = Environment.SpecialFolder.MyMusic;
                 DialogResult dr = this.folderBrowserDialog1.ShowDialog();
 
                 if (dr == DialogResult.OK) {
                     string path = this.folderBrowserDialog1.SelectedPath;
+                    Args args = new Args { drive = this._driveName, path = path };
+                    this.backgroundWorker1.RunWorkerAsync(args);
+                }
+            } else {
+                // change to Music after dev
+                this.folderBrowserDialog1.RootFolder = Environment.SpecialFolder.MyMusic;
+                DialogResult dr = this.folderBrowserDialog1.ShowDialog();
 
-                    foreach (DriveInfo drive in DriveInfo.GetDrives().Where(d => d.DriveType == DriveType.CDRom)) {
-                        if (drive.IsReady) {
-                            Args args = new Args { drive = drive.Name, path = path };
+                if (dr == DialogResult.OK) {
+                    try {
+                        this.burnButton.Enabled = false;
+                        string path = this.folderBrowserDialog1.SelectedPath;
+                        // this wont work if there are more than one cd drive
+                        DriveInfo drive = DriveInfo.GetDrives().Where(d => d.DriveType == DriveType.CDRom).Single();
+                        Args args = new Args { drive = drive.Name, path = path };
 
-                            this.progressBar1.Visible = true;
-                            this.progressBar1.Maximum = 100;
+                        this.progressBar1.Visible = true;
+                        this.progressBar1.Maximum = 100;
 
-                            this._isBurning = true;
-                            this.backgroundWorker1.RunWorkerAsync(args);
-                            return;
-                        } else {
-                            MessageBox.Show("Make sure there is a blank CD in the drive.");
-                        }
+                        this._isBurning = true;
+                        this.backgroundWorker1.RunWorkerAsync(args);
                     }
+                    catch (Exception err) {
+                        this.log.Log(err);
+                        MessageBox.Show("Found a non blank disc");
+                    }
+                    return;
                 }
             }
         }
@@ -147,12 +165,15 @@ namespace RipAndBurn
 
         private void burnerThread_onComplete(object sender, RunWorkerCompletedEventArgs e) {
             this._isBurning = false;
+            this.burnButton.Enabled = true;
             if (e.Error != null) {
 
                 if (e.Error is InvalidCastException) {
                     MessageBox.Show("CD seems to have something on it already try a new disc.");
+                    this.log.Log(e.Error);
                 } else {
-                    MessageBox.Show("We had a problem writing to the disc, unfortunately you may have to start over.");
+                    MessageBox.Show("We had a problem writing to the disc, unfortunately you may burn again.");
+                    this.log.Log(e.Error);
                 }
             } else {
                 this.outLabel.Text = "You did it, Rip and Burn Completed!!!!";
@@ -177,6 +198,7 @@ namespace RipAndBurn
                     this._isRipping = true;
                     this._watcher.Stop();
                     Action<int> startPbar = (total) => {
+                        this.actionButton.Enabled = false;
                         this.StartProgBar(total);
                         this.progressLabel.Text = "Fetching CD info...";
                         this.outLabel.Text = "I notice there is a CD I will start copying it";
@@ -190,24 +212,49 @@ namespace RipAndBurn
                         await this._cdRip.Get_CD_meta(query);
                         char dChar = drive.Name.ToCharArray(0, 1)[0];
 
-                        await this._cdRip.RipCDtoTemp(dChar);
+                        string saveLoc = "";
+                        this.Invoke((Action)(() => {
+                            DialogResult dr = MessageBox.Show("Save to default Music folder", "Save Folder", MessageBoxButtons.YesNo);
+
+                            if (dr == DialogResult.Yes) {
+                                saveLoc = Environment.GetFolderPath(Environment.SpecialFolder.MyMusic);
+                            }
+                            else {
+                                this.folderBrowserDialog1.RootFolder = Environment.SpecialFolder.MyComputer;
+                                DialogResult folderDR = this.folderBrowserDialog1.ShowDialog();
+
+                                if (folderDR == DialogResult.OK) {
+                                    saveLoc = this.folderBrowserDialog1.SelectedPath;
+                                }
+                            }
+
+                        }));
+                        await this._cdRip.RipCDtoTemp(dChar, saveLoc);
+
+                        this._cdRip.Open();
                         //stop watcher until burn is complete
                         this._isRipping = false;
                     } catch (IOException err) {
-                        MessageBox.Show("Something went wrong with the Ripping of the CD try again." 
-                            + err.ToString());
+                        this.log.Log(err);
+                        MessageBox.Show("Something went wrong with the Ripping of the CD try again.");
+                        this.Invoke(this.ResetProgBar, "Click Start Rip to Try again");
+
                     } catch (HttpRequestException err) {
-                        MessageBox.Show("Something went wrong, check your internet connection."
-                            + err.ToString());
-                    } catch(DiscId.DiscIdException dex) {
-                        MessageBox.Show("Something went wrong, this disc can not be read."
-                            + dex.ToString());
+                        this.log.Log(err);
+                        string msg = "Something went wrong, most likely the program could not connect to the internet."
+                            + "check your internet connection or simply try again, you know computers are funny.";
+                        MessageBox.Show(msg);
+                        this.Invoke(this.ResetProgBar, "Click Start Rip to Try again");
+
+                    } catch (DiscId.DiscIdException dex) {
+                        this.log.Log(dex);
+                        MessageBox.Show("Something went wrong, this disc can not be read.");
+                        this.Invoke(this.ResetProgBar, "Click Start Rip to Try again");
                     }
                     // READY TO BURN
-                    //this._cdRip.Open();
                 } else {
                     this._watcher.Stop();
-                    MessageBox.Show("No CD found to rip. Now you must click Start button.");
+                    MessageBox.Show("No CD found to rip. Now you must Click Start Rip button.");
                 }
             }
         }
@@ -216,8 +263,10 @@ namespace RipAndBurn
         {
             this._cdRip.Close();
             if (this._isBurning || this._isRipping) {
-                e.Cancel = true;
-                // show message
+                DialogResult res = MessageBox.Show("You are in the middle of something!! Are you sure", "WARNING", MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
+                if (res == DialogResult.No) {
+                    e.Cancel = true;
+                }
             }
         }
 
@@ -228,6 +277,10 @@ namespace RipAndBurn
             this.progressBar1.Maximum = numSections;
             this.progressBar1.Value = 0;
             this.progressBar1.Step = 1;
+        }
+
+        private void CreateButton_Click(object sender, EventArgs e) {
+
         }
     }
 }

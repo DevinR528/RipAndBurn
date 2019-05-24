@@ -16,7 +16,7 @@ using RipAndBurn.Rip.CDMetadata.Album;
 using RipAndBurn.Rip.CDMetadata.CDInfo;
 using Media = RipAndBurn.Rip.CDMetadata.Release.Media;
 using Ripper;
-
+using System.Collections.Generic;
 
 namespace RipAndBurn.Rip
 {
@@ -107,10 +107,10 @@ namespace RipAndBurn.Rip
                                     if (rels.Id != null) {
 
                                         string title = "";
-                                        if (rels.Title != null) {
-                                            title = rels.Title;
-                                        } else if (media.Title != null) {
+                                        if (media.Title != null && media.Title != "") {
                                             title = media.Title;
+                                        } else if (rels.Title != null && rels.Title != "") {
+                                            title = rels.Title;
                                         }
 
                                         if (title != "") {
@@ -122,9 +122,8 @@ namespace RipAndBurn.Rip
                                             string content = await resBuff2.ReadAsStringAsync();
                                             TrackList albums = TrackList.FromJson(content);
 
-                                            foreach (CDMetadata.Album.Media album in albums.Media
-                                                .Where((album) => album.TrackCount == media.TrackCount))
-                                            {
+                                            try {
+                                                CDMetadata.Album.Media album = albums.Media.Where(cd => cd.Title == title).Single();
                                                 this._album_title = this.CleanInvalidFolder(title);
                                                 this._form.progressBar1.Invoke(this._update, 2);
                                                 // set fields we care about
@@ -134,6 +133,31 @@ namespace RipAndBurn.Rip
                                                     this._form.progressLabel.Text = "Finised collecting CD info";
                                                 }));
                                                 return;
+                                            } catch {
+                                                using (InputBox box = new InputBox()) {
+                                                    box.ShowDialog();
+                                                    this._album_title = box.IboxTitle;
+                                                }
+
+                                                try {
+                                                    CDMetadata.Album.Media album_hope = albums.Media
+                                                        .Where(cd => cd.Title.Contains(this._album_title) || cd.TrackCount == media.TrackCount)
+                                                        .Single();
+                                                    this._form.progressBar1.Invoke(this._update, 2);
+                                                    // set fields we care about
+                                                    this._intrnCurrentCD = CurrentCD.FromMeta(album_hope, title);
+
+                                                    this._form.Invoke((Action)(() => {
+                                                        this._form.progressLabel.Text = "Finised collecting CD info";
+                                                    }));
+                                                    return;
+                                                } catch {
+                                                    using (InputBox box = new InputBox()) {
+                                                        box.ShowDialog();
+                                                        this._album_title = box.IboxTitle;
+                                                    }
+                                                    return;
+                                                }
                                             }
                                         } else {
                                             // no title, ask user for album title
@@ -182,7 +206,7 @@ namespace RipAndBurn.Rip
             return string.Join("", title.Split(invalid));
         }
 
-        async public Task RipCDtoTemp(char driveChar) {
+        async public Task RipCDtoTemp(char driveChar, string saveDir) {
             if (this.driver.Open(driveChar)) {
                 if (this.driver.IsCDReady()) {
                     if (this.driver.Refresh()) {
@@ -194,7 +218,7 @@ namespace RipAndBurn.Rip
                                 this._form.progressBar1.Value = 0;
                                 this._form.progressBar1.Maximum = 100;
                                 string song = this._intrnCurrentCD == null ? "" : this._intrnCurrentCD.Tracks[0].Name + " ";
-                                this._form.progressLabel.Text = $"Copying track (1. {song}) to Music";
+                                this._form.progressLabel.Text = $"Copying track (1. {song}) to temp folder";
                             }));
 
                             string tmp = Path.GetFullPath("tmp");
@@ -223,16 +247,26 @@ namespace RipAndBurn.Rip
                             }
                             this._form.progressBar1.Invoke((Action)(() => {
                                 this._form.progressBar1.Visible = false;
+                                this._form.actionButton.Enabled = true;
+
                                 this._form.progressLabel.Text = "Completed!";
                             }));
                             // encode files !!!!!!!!!!!!!!!
-                            await this.EncodeFolderMp3();
+                            await this.EncodeFolderMp3(saveDir);
                         }
                         catch (Exception e) {
                             throw new IOException("IO Stream failed", e);
                         }
                         finally {
                             this.driver.UnLockCD();
+
+                            // clear tmp folder no matter what
+                            string open_path = Path.GetFullPath("tmp");
+                            string[] files = Directory.GetFiles(open_path);
+
+                            for (int i = 0; i < files.Length; i++) {
+                                this.DeleteFile(files[i]);
+                            }
                         }
                     }
                 }
@@ -261,7 +295,7 @@ namespace RipAndBurn.Rip
                         this._form.progressBar1.Value = 0;
                         this._form.progressBar1.Maximum = 100;
                         string song = this._intrnCurrentCD == null ? "" : this._intrnCurrentCD.Tracks[this._trackNumRawProg].Name + " ";
-                        this._form.progressLabel.Text = $"Copying track ({this._trackNumRawProg}. {song}) to Music";
+                        this._form.progressLabel.Text = $"Copying track ({this._trackNumRawProg + 1}. {song}) to temp folder";
                         this._trackNumRawProg++;
                     }
                 }));
@@ -269,23 +303,7 @@ namespace RipAndBurn.Rip
         }
 
         // folder is where to get raw from
-        async private Task EncodeFolderMp3 () {
-            DialogResult dr = MessageBox.Show("Save to default Music folder", "Save Folder", MessageBoxButtons.YesNo);
-
-            string saveLoc = "";
-            if (dr == DialogResult.Yes) {
-                saveLoc = Environment.GetFolderPath(Environment.SpecialFolder.MyMusic);
-            } else {
-                this._form.Invoke((Action)(() => {
-                    this._form.folderBrowserDialog1.RootFolder = Environment.SpecialFolder.Desktop;
-                    DialogResult folderDR = this._form.folderBrowserDialog1.ShowDialog();
-
-                    if (folderDR == DialogResult.OK) {
-                        saveLoc = this._form.folderBrowserDialog1.SelectedPath;
-                    }
-                }));
-            }
-
+        async public Task EncodeFolderMp3 (string saveLoc) {
             // hardcode because all files in here are temporary, delete after encoding
             string open_path = Path.GetFullPath("tmp");
             string[] files = Directory.GetFiles(open_path);
@@ -305,7 +323,7 @@ namespace RipAndBurn.Rip
             for (int i = 0; i < files.Length; i++) {
                 try {
                     bool last = (files.Length - 1) == i;
-                    await this.EncodeFileMp3(files[i], i, d_info.FullName, last);
+                    await this.EncodeFileMp3(files[i], i, d_info.FullName, saveLoc, last);
                 } catch(Exception err) {
                     throw new IOException("Encoding Error", err);
                 }
@@ -313,7 +331,7 @@ namespace RipAndBurn.Rip
         }
 
         private long _totalInput;
-        async private Task EncodeFileMp3(string trkLoca, int trkNum, string saveDir, bool lastTrack) {
+        async private Task EncodeFileMp3(string trkLoca, int trkNum, string saveDir, string saveName, bool lastTrack) {
             ID3TagData tag = null;
 
             if (this._intrnCurrentCD != null) {
@@ -350,7 +368,7 @@ namespace RipAndBurn.Rip
                     }
                     else {
                         this._form.progressBar1.Invoke((Action<int>)((amt) => {
-                            this._form.progressLabel.Text = $"Converting ({title}) to MP3";
+                            this._form.progressLabel.Text = $"Converting ({title}) to MP3 and saving to {saveName} folder";
                             this._form.progressBar1.Increment(amt);
                         }), (int)inputBytes);
                     }

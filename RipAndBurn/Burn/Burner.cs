@@ -91,7 +91,7 @@ namespace RipAndBurn.Burn {
                         }
                     }
                     catch (Exception err) {
-                        throw new Burn.FormatException("Unable to create image on media", err);
+                        throw new Burn.FormatException("Unable to create image on media, check there is a blank CD in drive", err);
                     } finally {
                         if (this._cdFormat != null) {
                             Marshal.ReleaseComObject(this._cdFormat);
