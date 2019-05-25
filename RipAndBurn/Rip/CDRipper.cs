@@ -23,8 +23,6 @@ namespace RipAndBurn.Rip
 
 
     class CDRipper {
-
-        private bool _isOpen = false;
         private string _album_title = "";
 
         private CurrentCD _intrnCurrentCD;
@@ -35,6 +33,7 @@ namespace RipAndBurn.Rip
 
         private InputBox _iBox;
         private RipBurn _form;
+        private Logger log;
 
         public CurrentCD CDRom {
             get => this._intrnCurrentCD;
@@ -49,18 +48,11 @@ namespace RipAndBurn.Rip
                                                    int uReturnLength,
                                                    IntPtr hwndCallback);
         public void Open() {
-            if (!this._isOpen) {
-                int ret = mciSendString("set cdaudio door open", null, 0, IntPtr.Zero);
-                this._isOpen = true;
-            }
+            int ret = mciSendString("set cdaudio door open", null, 0, IntPtr.Zero);
         }
 
         public void Close() {
-            if (this._isOpen) {
-                int ret = mciSendString("set cdaudio door closed", null, 0, IntPtr.Zero);
-                this._isOpen = false;
-            }
-
+            int ret = mciSendString("set cdaudio door closed", null, 0, IntPtr.Zero);
         }
 
         public string GetCD_Id(string drive, RipBurn rip) {
@@ -243,6 +235,7 @@ namespace RipAndBurn.Rip
                                 }
                                 finally {
                                     file_st.Close();
+                                    this.driver.UnLockCD();
                                 }
                             }
                             this._form.progressBar1.Invoke((Action)(() => {
@@ -258,8 +251,8 @@ namespace RipAndBurn.Rip
                             throw new IOException("IO Stream failed", e);
                         }
                         finally {
-                            this.driver.UnLockCD();
 
+                            this.driver.UnLockCD();
                             // clear tmp folder no matter what
                             string open_path = Path.GetFullPath("tmp");
                             string[] files = Directory.GetFiles(open_path);
@@ -267,13 +260,20 @@ namespace RipAndBurn.Rip
                             for (int i = 0; i < files.Length; i++) {
                                 this.DeleteFile(files[i]);
                             }
+                            try {
+                                DriveInfo drive = DriveInfo.GetDrives().Where(d => d.DriveType == DriveType.CDRom).Single();
+                                this.driver.Open(drive.Name.ToCharArray()[0]);
+                            }
+                            catch (Exception err) {
+                                this.log.Log(err);
+                            }
                         }
                     }
                 }
             }
             else {
                 // drive could not be read
-                MessageBox.Show("Could not read media try another CD, I'm not sure if a DVD will work.");
+                MessageBox.Show("Could not read media try another CD.");
             }
         }
 

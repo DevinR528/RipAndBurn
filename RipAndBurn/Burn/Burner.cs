@@ -26,6 +26,7 @@ namespace RipAndBurn.Burn {
 
         private RipBurn _form;
 
+        private Logger log;
 
         private BurnData _bData = new BurnData();
 
@@ -64,7 +65,6 @@ namespace RipAndBurn.Burn {
 
                 this._bData.uniqueRecorderId = discRecorder2.ActiveDiscRecorder;
 
-                // FIXME
                 if (this._driveName == (string)discRecorder2.VolumePathNames[0]) {
                     try {
                         this._cdFormat.Recorder = discRecorder2;
@@ -86,11 +86,21 @@ namespace RipAndBurn.Burn {
                                 disc_fmt_data.Write(fileSystem);
                             }
                             catch (Exception err) {
+                                this.log.Log(err);
                                 throw new BurnException("Write failed", err);
+                            } finally {
+                                if (this._cdFormat != null) {
+                                    Marshal.ReleaseComObject(this._cdFormat);
+                                }
+
+                                if (this._fsImage != null) {
+                                    Marshal.ReleaseComObject(this._fsImage);
+                                }
                             }
                         }
                     }
                     catch (Exception err) {
+                        this.log.Log(err);
                         throw new Burn.FormatException("Unable to create image on media, check there is a blank CD in drive", err);
                     } finally {
                         if (this._cdFormat != null) {
@@ -126,13 +136,18 @@ namespace RipAndBurn.Burn {
 
             IFsiDirectoryItem rootItem = this._fsImage.Root;
 
-            foreach (string path in this._fileLoc) {
-                string full = Path.GetFullPath(path);
-                var fileItem = new FileItem(full);
-                fileItem.AddToFileSystem(rootItem);
-            }
+            try {
+                foreach (string path in this._fileLoc) {
+                    string full = Path.GetFullPath(path);
+                    var fileItem = new FileItem(full);
+                    fileItem.AddToFileSystem(rootItem);
+                }
 
-            ds = this._fsImage.CreateResultImage().ImageStream;
+                ds = this._fsImage.CreateResultImage().ImageStream;
+            } catch (Exception err) {
+                this.log.Log(err);
+                throw new BadImageFormatException("Could not create image or file items on image", err);
+            }
             return true;
         }
 

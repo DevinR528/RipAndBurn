@@ -41,18 +41,25 @@ namespace IMAPI2.MediaItem
             IntPtr hImg = Win32.SHGetFileInfo(filePath, 0, ref shinfo,
                 (uint)Marshal.SizeOf(shinfo), Win32.SHGFI_ICON | Win32.SHGFI_SMALLICON);
 
-            if (shinfo.hIcon != null)
-            {
+            if (shinfo.hIcon != null) {
                 //The icon is returned in the hIcon member of the shinfo struct
                 System.Drawing.IconConverter imageConverter = new System.Drawing.IconConverter();
-                System.Drawing.Icon icon = System.Drawing.Icon.FromHandle(shinfo.hIcon);
+                
                 try
                 {
-                    fileIconImage = (System.Drawing.Image)
-                        imageConverter.ConvertTo(icon, typeof(System.Drawing.Image));
-                }
-                catch (NotSupportedException)
-                {
+                //    System.Drawing.Icon icon = System.Drawing.Icon.FromHandle(shinfo.hIcon);
+                //    fileIconImage = (System.Drawing.Image)
+                //        imageConverter.ConvertTo(icon, typeof(System.Drawing.Image));
+                //}
+                //catch (Exception err)
+                //{
+                    using (System.Drawing.Icon sysicon = System.Drawing.Icon.ExtractAssociatedIcon(filePath)) {
+                        IntPtr handle = sysicon.Handle;
+                        System.Drawing.Icon icon = System.Drawing.Icon.FromHandle(handle);
+                        fileIconImage = (System.Drawing.Image)imageConverter.ConvertTo(icon, typeof(System.Drawing.Image));
+                    }
+                } catch (Exception err) {
+                    throw new Exception("", err);
                 }
 
                 Win32.DestroyIcon(shinfo.hIcon);

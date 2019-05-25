@@ -12,6 +12,9 @@ using RipAndBurn.Rip;
 using RipAndBurn.Burn;
 using IMAPI2.Interop;
 using System.Net.Http;
+// internal cd driver
+using Ripper;
+using System.Collections.Generic;
 
 namespace RipAndBurn
 {
@@ -30,6 +33,8 @@ namespace RipAndBurn
         public Action<string> ResetProgBar;
 
         private string _driveName;
+
+        private CDDrive driver = new CDDrive();
 
         private CDRipper _cdRip;
 
@@ -88,8 +93,8 @@ namespace RipAndBurn
                     this.backgroundWorker1.RunWorkerAsync(args);
                 }
             } else {
-                // change to Music after dev
-                this.folderBrowserDialog1.RootFolder = Environment.SpecialFolder.MyMusic;
+                // no rip so find folder
+                this.folderBrowserDialog1.RootFolder = Environment.SpecialFolder.MyComputer;
                 DialogResult dr = this.folderBrowserDialog1.ShowDialog();
 
                 if (dr == DialogResult.OK) {
@@ -165,6 +170,7 @@ namespace RipAndBurn
 
         private void burnerThread_onComplete(object sender, RunWorkerCompletedEventArgs e) {
             this._isBurning = false;
+            this.driver.UnLockCD();
             this.burnButton.Enabled = true;
             if (e.Error != null) {
 
@@ -172,19 +178,15 @@ namespace RipAndBurn
                     MessageBox.Show("CD seems to have something on it already try a new disc.");
                     this.log.Log(e.Error);
                 } else {
-                    MessageBox.Show("We had a problem writing to the disc, unfortunately you may burn again.");
+                    MessageBox.Show("We had a problem writing to the disc, you may have to burn again.");
                     this.log.Log(e.Error);
                 }
             } else {
                 this.outLabel.Text = "You did it, Rip and Burn Completed!!!!";
                 this._cdRip.Open();
+                this.progressBar1.Visible = false;
+                this.progressLabel.Text = "";
             }
-            this.progressBar1.Visible = false;
-            this.progressLabel.Text = "";
-        }
-
-        private void CancelButton_Click(object sender, EventArgs e) {
-            
         }
 
         // EVENTS **************************************************************
@@ -230,9 +232,6 @@ namespace RipAndBurn
 
                         }));
                         await this._cdRip.RipCDtoTemp(dChar, saveLoc);
-
-                        this._cdRip.Open();
-                        //stop watcher until burn is complete
                         this._isRipping = false;
                     } catch (IOException err) {
                         this.log.Log(err);
@@ -250,6 +249,9 @@ namespace RipAndBurn
                         this.log.Log(dex);
                         MessageBox.Show("Something went wrong, this disc can not be read.");
                         this.Invoke(this.ResetProgBar, "Click Start Rip to Try again");
+                    } finally {
+                        this.driver.UnLockCD();
+                        this._cdRip.Open();
                     }
                     // READY TO BURN
                 } else {
@@ -259,13 +261,23 @@ namespace RipAndBurn
             }
         }
         // Closes Form
-        private void ripper_onFormClose(object sender, FormClosingEventArgs e)
-        {
-            this._cdRip.Close();
+        private void ripper_onFormClose(object sender, FormClosingEventArgs e) {
+            
+            this.driver.UnLockCD();
             if (this._isBurning || this._isRipping) {
                 DialogResult res = MessageBox.Show("You are in the middle of something!! Are you sure", "WARNING", MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
                 if (res == DialogResult.No) {
                     e.Cancel = true;
+                } else {
+                    // clear tmp folder no matter what
+                    string open_path = Path.GetFullPath("tmp");
+                    string[] files = Directory.GetFiles(open_path);
+
+                    for (int i = 0; i < files.Length; i++) {
+                        File.Delete(files[i]);
+                    }
+
+                    this.driver.Close();
                 }
             }
         }
