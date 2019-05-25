@@ -37,32 +37,26 @@ namespace IMAPI2.MediaItem
             //
             // Get the File icon
             //
-            SHFILEINFO shinfo = new SHFILEINFO();
-            IntPtr hImg = Win32.SHGetFileInfo(filePath, 0, ref shinfo,
-                (uint)Marshal.SizeOf(shinfo), Win32.SHGFI_ICON | Win32.SHGFI_SMALLICON);
+            //SHFILEINFO shinfo = new SHFILEINFO();
+            //IntPtr hImg = Win32.SHGetFileInfo(filePath, 0, ref shinfo,
+            //    (uint)Marshal.SizeOf(shinfo), Win32.SHGFI_ICON | Win32.SHGFI_SMALLICON);
 
-            if (shinfo.hIcon != null) {
-                //The icon is returned in the hIcon member of the shinfo struct
-                System.Drawing.IconConverter imageConverter = new System.Drawing.IconConverter();
-                
-                try
-                {
+            //The icon is returned in the hIcon member of the shinfo struct
+            System.Drawing.IconConverter imageConverter = new System.Drawing.IconConverter();
+            try {
                 //    System.Drawing.Icon icon = System.Drawing.Icon.FromHandle(shinfo.hIcon);
                 //    fileIconImage = (System.Drawing.Image)
                 //        imageConverter.ConvertTo(icon, typeof(System.Drawing.Image));
                 //}
                 //catch (Exception err)
                 //{
-                    using (System.Drawing.Icon sysicon = System.Drawing.Icon.ExtractAssociatedIcon(filePath)) {
-                        IntPtr handle = sysicon.Handle;
-                        System.Drawing.Icon icon = System.Drawing.Icon.FromHandle(handle);
-                        fileIconImage = (System.Drawing.Image)imageConverter.ConvertTo(icon, typeof(System.Drawing.Image));
-                    }
-                } catch (Exception err) {
-                    throw new Exception("", err);
+                using (System.Drawing.Icon sysicon = System.Drawing.Icon.ExtractAssociatedIcon(filePath)) {
+                    IntPtr handle = sysicon.Handle;
+                    System.Drawing.Icon icon = System.Drawing.Icon.FromHandle(handle);
+                    fileIconImage = (System.Drawing.Image)imageConverter.ConvertTo(icon, typeof(System.Drawing.Image));
                 }
-
-                Win32.DestroyIcon(shinfo.hIcon);
+            } catch (Exception err) {
+                throw new Exception("", err);
             }
         }
 
