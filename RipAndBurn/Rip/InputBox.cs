@@ -34,5 +34,9 @@ namespace RipAndBurn {
                 e.Cancel = true;
             }
         }
+
+        private void InputBox_Load(object sender, EventArgs e) {
+            nameTextBox.Focus();
+        }
     }
 }

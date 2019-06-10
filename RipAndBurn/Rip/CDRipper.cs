@@ -11,12 +11,13 @@ using NAudio.Wave;
 using NAudio.Lame;
 using DiscId;
 
+using Ripper;
+
 using RipAndBurn.Rip.CDMetadata.Release;
 using RipAndBurn.Rip.CDMetadata.Album;
 using RipAndBurn.Rip.CDMetadata.CDInfo;
+
 using Media = RipAndBurn.Rip.CDMetadata.Release.Media;
-using Ripper;
-using System.Collections.Generic;
 
 namespace RipAndBurn.Rip
 {
@@ -24,6 +25,8 @@ namespace RipAndBurn.Rip
 
     class CDRipper {
         private string _album_title = "";
+
+        private string _cdTrayName = "";
 
         private CurrentCD _intrnCurrentCD;
         private Action<int> _update;
@@ -33,13 +36,16 @@ namespace RipAndBurn.Rip
 
         private InputBox _iBox;
         private RipBurn _form;
-        private Logger log;
+        private FileLogger log = new FileLogger();
 
         public CurrentCD CDRom {
             get => this._intrnCurrentCD;
         }
 
-        public CDRipper() { }
+        public CDRipper(string drive, RipBurn rip) {
+            this._form = rip;
+            this._cdTrayName = drive;
+        }
 
         // open and close cd drive
         [DllImport("winmm.dll", EntryPoint = "mciSendStringA", CharSet = CharSet.Ansi)]
@@ -55,19 +61,22 @@ namespace RipAndBurn.Rip
             int ret = mciSendString("set cdaudio door closed", null, 0, IntPtr.Zero);
         }
 
-        public string GetCD_Id(string drive, RipBurn rip) {
-            this._form = rip;
-            this._update = (amt) => this._form.progressBar1.Value += amt;
+        async public Task GetCD_Id() {
+            this._update = (amt) => {
+                if (this._form.progressBar1.Value + amt <= this._form.progressBar1.Maximum) {
+                    this._form.progressBar1.Value += amt;
+                }
+            };
 
             this._form.progressBar1.Invoke(this._update, 2);
             try {
-                using (var disc = DiscId.Disc.Read(drive, Features.Mcn | Features.Isrc)) {
+                using (var disc = DiscId.Disc.Read(this._cdTrayName, Features.Mcn | Features.Isrc)) {
                     string queryRaw = disc.SubmissionUrl.ToString();
 
                     this._form.progressBar1.Invoke(this._update, 2);
                     string[] queryArr = queryRaw.Split(new string[] { "id=", "&" }, StringSplitOptions.None);
                     string query = $"{queryArr[1]}?&{queryArr[2]}&{queryArr[3]}";
-                    return query;
+                    await this.Get_CD_meta(query);
                 }
             }
             catch (DiscIdException ex) {
@@ -198,8 +207,8 @@ namespace RipAndBurn.Rip
             return string.Join("", title.Split(invalid));
         }
 
-        async public Task RipCDtoTemp(char driveChar, string saveDir) {
-            if (this.driver.Open(driveChar)) {
+        async public Task RipCDtoTemp(string saveDir) {
+            if (this.driver.Open(this._cdTrayName.ToCharArray()[0])) {
                 if (this.driver.IsCDReady()) {
                     if (this.driver.Refresh()) {
                         int trks = this.driver.GetNumTracks();
@@ -241,6 +250,7 @@ namespace RipAndBurn.Rip
                             this._form.progressBar1.Invoke((Action)(() => {
                                 this._form.progressBar1.Visible = false;
                                 this._form.actionButton.Enabled = true;
+                                this._form.createButton.Enabled = true;
 
                                 this._form.progressLabel.Text = "Completed!";
                             }));
@@ -286,12 +296,14 @@ namespace RipAndBurn.Rip
 
         private int _trackNumRawProg = 1;
         private void CdReadProgress(object sender, ReadProgressEventArgs ea) {
+            
             ulong percent = ((ulong)ea.BytesRead * 100) / ea.Bytes2Read;
             if (percent < 100) {
                 this._form.progressBar1.Invoke((Action<int>)((amt) => this._form.progressBar1.Value = amt), (int)percent);
             } else {
                 this._form.progressBar1.Invoke((Action)(() => {
-                    if (this._trackNumRawProg < this._intrnCurrentCD.Tracks.Count) {
+                    int num_songs = this._intrnCurrentCD == null ? 0 : this._intrnCurrentCD.Tracks.Count;
+                    if (this._trackNumRawProg < num_songs || this._intrnCurrentCD == null) {
                         this._form.progressBar1.Value = 0;
                         this._form.progressBar1.Maximum = 100;
                         string song = this._intrnCurrentCD == null ? "" : this._intrnCurrentCD.Tracks[this._trackNumRawProg].Name + " ";
@@ -302,14 +314,14 @@ namespace RipAndBurn.Rip
             }
         }
 
-        // folder is where to get raw from
-        async public Task EncodeFolderMp3 (string saveLoc) {
+        // folder is where we get .raw tracks from
+        async public Task EncodeFolderMp3(string saveLoc) {
             // hardcode because all files in here are temporary, delete after encoding
             string open_path = Path.GetFullPath("tmp");
             string[] files = Directory.GetFiles(open_path);
 
             if (Directory.GetDirectories(saveLoc).Where((f) => f == this._album_title).Count() > 0) {
-                string[] cmp_files = Directory.GetFiles(saveLoc+this._album_title);
+                string[] cmp_files = Directory.GetFiles(saveLoc + this._album_title);
                 if (cmp_files.Length != files.Length) {
                     this._album_title += DateTime.Now.ToShortDateString();
                 } else {
@@ -319,12 +331,17 @@ namespace RipAndBurn.Rip
                 }
             }
 
+            // error from open directory somewhere here or encodefilemp3
             DirectoryInfo d_info = Directory.CreateDirectory($"{saveLoc}\\{this._album_title}");
+
+            this.log.Log($"Converting to mp3 Path: {d_info.Name}");
+            string path = d_info.FullName;
             for (int i = 0; i < files.Length; i++) {
                 try {
                     bool last = (files.Length - 1) == i;
                     await this.EncodeFileMp3(files[i], i, d_info.FullName, saveLoc, last);
                 } catch(Exception err) {
+                    this.log.Log(err);
                     throw new IOException("Encoding Error", err);
                 }
             }
@@ -374,7 +391,7 @@ namespace RipAndBurn.Rip
                     }
                 });
                 await audio_in.CopyToAsync(audio_out);
-                this.DeleteFile(trkLoca);
+                audio_in.Close(); audio_out.Close();
             }
         }
 

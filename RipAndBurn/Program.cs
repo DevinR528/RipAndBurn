@@ -24,6 +24,7 @@ namespace RipAndBurn
             catch (Exception err) {
                 log.Log(err);
                 Application.Exit();
+                System.Diagnostics.Process.Start(Application.ExecutablePath);
             }
 
         }

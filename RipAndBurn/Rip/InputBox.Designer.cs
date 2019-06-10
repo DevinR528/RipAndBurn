@@ -59,6 +59,7 @@
             // 
             // InputBox
             // 
+            this.AcceptButton = this.nameButton;
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(297, 109);
@@ -69,6 +70,7 @@
             this.Name = "InputBox";
             this.Text = "Find Album Title";
             this.FormClosing += new System.Windows.Forms.FormClosingEventHandler(this.onForm_Closing);
+            this.Load += new System.EventHandler(this.InputBox_Load);
             this.ResumeLayout(false);
             this.PerformLayout();
 
@@ -78,6 +80,6 @@
 
         private System.Windows.Forms.Button nameButton;
         private System.Windows.Forms.Label label1;
-        private System.Windows.Forms.TextBox nameTextBox;
+        public System.Windows.Forms.TextBox nameTextBox;
     }
 }

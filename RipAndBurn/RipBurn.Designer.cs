@@ -38,7 +38,6 @@
             this.backgroundWorker1 = new System.ComponentModel.BackgroundWorker();
             this.folderBrowserDialog1 = new System.Windows.Forms.FolderBrowserDialog();
             this.createButton = new System.Windows.Forms.Button();
-            this.label1 = new System.Windows.Forms.Label();
             this.SuspendLayout();
             // 
             // actionButton
@@ -95,7 +94,6 @@
             // 
             // createButton
             // 
-            this.createButton.Enabled = false;
             this.createButton.Location = new System.Drawing.Point(19, 254);
             this.createButton.Name = "createButton";
             this.createButton.Size = new System.Drawing.Size(106, 23);
@@ -104,22 +102,12 @@
             this.createButton.UseVisualStyleBackColor = true;
             this.createButton.Click += new System.EventHandler(this.CreateButton_Click);
             // 
-            // label1
-            // 
-            this.label1.AutoSize = true;
-            this.label1.Location = new System.Drawing.Point(25, 238);
-            this.label1.Name = "label1";
-            this.label1.Size = new System.Drawing.Size(96, 13);
-            this.label1.TabIndex = 6;
-            this.label1.Text = "Not ready quite yet";
-            // 
             // RipBurn
             // 
             this.AcceptButton = this.actionButton;
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Inherit;
             this.AutoScroll = true;
             this.ClientSize = new System.Drawing.Size(536, 297);
-            this.Controls.Add(this.label1);
             this.Controls.Add(this.createButton);
             this.Controls.Add(this.progressLabel);
             this.Controls.Add(this.burnButton);
@@ -145,8 +133,7 @@
         public System.Windows.Forms.FolderBrowserDialog folderBrowserDialog1;
         public System.Windows.Forms.Label outLabel;
         public System.Windows.Forms.Button actionButton;
-        private System.Windows.Forms.Button createButton;
-        private System.Windows.Forms.Label label1;
+        public System.Windows.Forms.Button createButton;
     }
 }
 

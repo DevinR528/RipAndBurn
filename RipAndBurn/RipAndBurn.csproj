@@ -54,14 +54,8 @@
     <ApplicationIcon>RipBurn.ico</ApplicationIcon>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="ATL, Version=2.9.0.0, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>..\packages\z440.atl.core.2.9.0\lib\net30\ATL.dll</HintPath>
-    </Reference>
     <Reference Include="DotNetDiscId, Version=0.2.3.0, Culture=neutral, PublicKeyToken=ca8751e4a7772118, processorArchitecture=MSIL">
       <HintPath>..\packages\DotNetDiscId.0.2.3\lib\net20\DotNetDiscId.dll</HintPath>
-    </Reference>
-    <Reference Include="Hqub.MusicBrainz.API, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>..\packages\MusicBrainzAPI.1.0.0\lib\net45\Hqub.MusicBrainz.API.dll</HintPath>
     </Reference>
     <Reference Include="NAudio, Version=1.8.1.0, Culture=neutral, processorArchitecture=MSIL">
       <HintPath>..\packages\NAudio.1.8.1\lib\net35\NAudio.dll</HintPath>
@@ -89,7 +83,13 @@
   <ItemGroup>
     <Compile Include="Burn\BurnData.cs" />
     <Compile Include="Burn\Burner.cs" />
-    <Compile Include="Burn\Errors.cs" />
+    <Compile Include="Create\createForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Create\createForm.Designer.cs">
+      <DependentUpon>createForm.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Errors.cs" />
     <Compile Include="Burn\FileItem.cs" />
     <Compile Include="Burn\imapi2Interop.cs" />
     <Compile Include="Burn\IMediaItem.cs" />
@@ -123,6 +123,9 @@
     <Compile Include="WavLib\WaveWriter.cs" />
     <Compile Include="WavLib\Win32Functions.cs" />
     <Compile Include="WavLib\WriterConfig.cs" />
+    <EmbeddedResource Include="Create\createForm.resx">
+      <DependentUpon>createForm.cs</DependentUpon>
+    </EmbeddedResource>
     <EmbeddedResource Include="RipBurn.resx">
       <DependentUpon>RipBurn.cs</DependentUpon>
     </EmbeddedResource>

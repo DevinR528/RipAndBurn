@@ -17,16 +17,13 @@ namespace RipAndBurn.Burn {
 
         private string _driveName;
 
-        private bool _isBurning = false;
-
         private List<string> _fileLoc;
-        private CurrentCD _currCd;
 
         private string _title;
 
-        private RipBurn _form;
+        private dynamic _form;
 
-        private Logger log;
+        private FileLogger log = new FileLogger();
 
         private BurnData _bData = new BurnData();
 
@@ -35,19 +32,27 @@ namespace RipAndBurn.Burn {
         private MsftDiscFormat2Data _cdFormat;
 
 
-        public Burner(string drive, string path, CurrentCD cd, RipBurn form) {
+        public Burner(string drive, string path, RipBurn form) {
             this._driveName = drive;
 
-            if (cd == null) {
-                this._fileLoc = Directory.GetFiles(path).ToList();
-                this._title = path.Split('\\').Last();
-            } else {
-                this._fileLoc = cd.Tracks.Select((trk) => trk.Name).ToList();
-                this._title = cd.Title;
-            }
+            this._fileLoc = Directory.GetFiles(path).ToList();
+            this._title = path.Split('\\').Last();
+            
+            this._form = form;
+
+            this.log.Log("Start Burn");
+            this.StartBurn();
+        }
+
+        public Burner(string drive, List<string> paths, Create.CreateCD form) {
+            this._driveName = drive;
+
+            this._fileLoc = paths;
+            this._title = "Mix";
 
             this._form = form;
 
+            this.log.Log("Start Burn");
             this.StartBurn();
         }
 
@@ -68,7 +73,7 @@ namespace RipAndBurn.Burn {
                 if (this._driveName == (string)discRecorder2.VolumePathNames[0]) {
                     try {
                         this._cdFormat.Recorder = discRecorder2;
-                        
+
                         // creates mut filesys using disc recorder
                         System.Runtime.InteropServices.ComTypes.IStream fileSystem;
                         if (this.CreateFs(discRecorder2, out fileSystem)) {
@@ -80,7 +85,7 @@ namespace RipAndBurn.Burn {
                             };
 
                             disc_fmt_data.Update += discWrite_onProgress;
-
+                            this.log.Log("Start Image Write");
                             try {
                                 // write to disc
                                 disc_fmt_data.Write(fileSystem);
@@ -88,20 +93,25 @@ namespace RipAndBurn.Burn {
                             catch (Exception err) {
                                 this.log.Log(err);
                                 throw new BurnException("Write failed", err);
-                            } finally {
+                            }
+                            finally {
                                 if (this._cdFormat != null) {
                                     Marshal.ReleaseComObject(this._cdFormat);
                                 }
-
                                 if (this._fsImage != null) {
                                     Marshal.ReleaseComObject(this._fsImage);
                                 }
                             }
                         }
                     }
-                    catch (Exception err) {
+                    catch (COMException err) {
                         this.log.Log(err);
-                        throw new Burn.FormatException("Unable to create image on media, check there is a blank CD in drive", err);
+                        throw new FormatException("Unable to create image on media, check there is a blank CD in drive", err);
+                    }
+                    catch (Exception err) {
+                        Type e = err.GetType();
+                        this.log.Log(err, e.Name);
+                        throw new UnreachException("HMMMM NOT COOL", err);
                     } finally {
                         if (this._cdFormat != null) {
                             Marshal.ReleaseComObject(this._cdFormat);
@@ -142,7 +152,7 @@ namespace RipAndBurn.Burn {
                     var fileItem = new FileItem(full);
                     fileItem.AddToFileSystem(rootItem);
                 }
-
+                this.log.Log("Create FS Image");
                 ds = this._fsImage.CreateResultImage().ImageStream;
             } catch (Exception err) {
                 this.log.Log(err);

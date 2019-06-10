@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace RipAndBurn.Burn {
+namespace RipAndBurn {
     [System.Serializable]
     public class BurnException : Exception {
         public BurnException() { }
@@ -21,6 +21,16 @@ namespace RipAndBurn.Burn {
         public FormatException(string message) : base(message) { }
         public FormatException(string message, Exception inner) : base(message, inner) { }
         protected FormatException(
+          System.Runtime.Serialization.SerializationInfo info,
+          System.Runtime.Serialization.StreamingContext context) : base(info, context) { }
+    }
+
+    [System.Serializable]
+    public class UnreachException : Exception {
+        public UnreachException() { }
+        public UnreachException(string message) : base(message) { }
+        public UnreachException(string message, Exception inner) : base(message, inner) { }
+        protected UnreachException(
           System.Runtime.Serialization.SerializationInfo info,
           System.Runtime.Serialization.StreamingContext context) : base(info, context) { }
     }

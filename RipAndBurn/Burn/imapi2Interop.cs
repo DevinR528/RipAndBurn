@@ -11,6 +11,7 @@ using System.Runtime.InteropServices;
 using System.Runtime.InteropServices.ComTypes;
 using System.Runtime.CompilerServices;
 using System.Threading;
+using System.Collections.Generic;
 
 namespace IMAPI2.Interop
 {
@@ -115,7 +116,9 @@ namespace IMAPI2.Interop
             Monitor.Enter(this);
             try
             {
-                foreach (DiscFormat2Data_SinkHelper helper in m_aEventSinkHelpers)
+
+                // added dict mapping when this was needed it threw casting error
+                foreach (DiscFormat2Data_SinkHelper helper in m_aEventSinkHelpers.Values)
                 {
                     m_connectionPoint.Unadvise(helper.Cookie);
                 }
@@ -942,10 +945,14 @@ namespace IMAPI2.Interop
             Monitor.Enter(this);
             try
             {
-                foreach (DFileSystemImage_SinkHelper helper in m_aEventSinkHelpers)
-                {
+                // added dict mapping when this was needed it threw casting error
+                foreach (DFileSystemImage_SinkHelper helper in m_aEventSinkHelpers.Values) {
                     m_connectionPoint.Unadvise(helper.Cookie);
                 }
+                //foreach (DFileSystemImage_SinkHelper helper in m_aEventSinkHelpers)
+                //{
+                //    m_connectionPoint.Unadvise(helper.Cookie);
+                //}
 
                 m_aEventSinkHelpers.Clear();
                 Marshal.ReleaseComObject(m_connectionPoint);

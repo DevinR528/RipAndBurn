@@ -14,7 +14,7 @@ using IMAPI2.Interop;
 using System.Net.Http;
 // internal cd driver
 using Ripper;
-using System.Collections.Generic;
+using RipAndBurn.Create;
 
 namespace RipAndBurn
 {
@@ -47,9 +47,6 @@ namespace RipAndBurn
             this.progressLabel.Text = "";
             this.progressBar1.Visible = false;
 
-
-            this._cdRip = new CDRipper();
-
             this.backgroundWorker1.WorkerReportsProgress = true;
 
             WqlEventQuery q = new WqlEventQuery();
@@ -71,13 +68,15 @@ namespace RipAndBurn
                 this.progressBar1.Visible = false;
                 this.outLabel.Text = msg;
                 this.progressLabel.Text = "";
+                this.actionButton.Enabled = true;
             };
             // NEED
             //this._watcher.Start();
         }
 
         private void ActionButton_Click(object sender, EventArgs e) {
-            this._cdRip.Open();
+            if (this._cdRip != null)
+                this._cdRip.Open();
             this._watcher.Start();
         }
 
@@ -122,11 +121,13 @@ namespace RipAndBurn
 
         private void burnerThread_doWork(object sender, DoWorkEventArgs e) {
             Args arg = (Args)e.Argument;
-            new Burner(arg.drive, arg.path, this._cdRip.CDRom, this);
+            new Burner(arg.drive, arg.path, this);
         }
 
         private void burnerThread_onProgress(object sender, ProgressChangedEventArgs e) {
             var burnData = (BurnData)e.UserState;
+
+            this.StartProgBar(100);
 
             if (burnData.task == BURN_MEDIA_TASK.BURN_MEDIA_TASK_FILE_SYSTEM) {
                 this.progressLabel.Text = burnData.statusMessage;
@@ -183,7 +184,7 @@ namespace RipAndBurn
                 }
             } else {
                 this.outLabel.Text = "You did it, Rip and Burn Completed!!!!";
-                this._cdRip.Open();
+                //this._cdRip.Open();
                 this.progressBar1.Visible = false;
                 this.progressLabel.Text = "";
             }
@@ -200,19 +201,22 @@ namespace RipAndBurn
                     this._isRipping = true;
                     this._watcher.Stop();
                     Action<int> startPbar = (total) => {
+
                         this.actionButton.Enabled = false;
+                        this.createButton.Enabled = false;
+
                         this.StartProgBar(total);
                         this.progressLabel.Text = "Fetching CD info...";
                         this.outLabel.Text = "I notice there is a CD I will start copying it";
                     };
                     this.progressBar1.Invoke(startPbar, 12);
-                    
-                    try {
-                        // *************************************            clearly this is terible
-                        string query = this._cdRip.GetCD_Id(this._driveName, this);
 
-                        await this._cdRip.Get_CD_meta(query);
-                        char dChar = drive.Name.ToCharArray(0, 1)[0];
+                    bool err_flag = false;
+                    try {
+                        this.log.Log("Start Get CD INFO");
+                        // ****************************         clearly this is terible
+                        this._cdRip = new CDRipper(this._driveName, this);
+                        await this._cdRip.GetCD_Id();
 
                         string saveLoc = "";
                         this.Invoke((Action)(() => {
@@ -231,27 +235,44 @@ namespace RipAndBurn
                             }
 
                         }));
-                        await this._cdRip.RipCDtoTemp(dChar, saveLoc);
-                        this._isRipping = false;
+
+                        await this._cdRip.RipCDtoTemp(saveLoc);
+
                     } catch (IOException err) {
                         this.log.Log(err);
                         MessageBox.Show("Something went wrong with the Ripping of the CD try again.");
                         this.Invoke(this.ResetProgBar, "Click Start Rip to Try again");
+                        err_flag = true;
 
-                    } catch (HttpRequestException err) {
+                    }
+                    catch (HttpRequestException err) {
                         this.log.Log(err);
                         string msg = "Something went wrong, most likely the program could not connect to the internet."
                             + "check your internet connection or simply try again, you know computers are funny.";
                         MessageBox.Show(msg);
                         this.Invoke(this.ResetProgBar, "Click Start Rip to Try again");
+                        err_flag = true;
 
-                    } catch (DiscId.DiscIdException dex) {
+                    }
+                    catch (DiscId.DiscIdException dex) {
                         this.log.Log(dex);
                         MessageBox.Show("Something went wrong, this disc can not be read.");
                         this.Invoke(this.ResetProgBar, "Click Start Rip to Try again");
+                        err_flag = true;
+                    }
+                    catch (Exception err) {
+                        this.log.Log("Unreachable?");
+                        this.log.Log(err);
+                        this.Invoke(this.ResetProgBar, "Click Start Rip to Try again");
+                        err_flag = true;
+
                     } finally {
                         this.driver.UnLockCD();
-                        this._cdRip.Open();
+                        this._isRipping = false;
+
+                        if (!err_flag) {
+                            this._cdRip.Open();
+                        }
                     }
                     // READY TO BURN
                 } else {
@@ -274,7 +295,11 @@ namespace RipAndBurn
                     string[] files = Directory.GetFiles(open_path);
 
                     for (int i = 0; i < files.Length; i++) {
-                        File.Delete(files[i]);
+                        try {
+                            File.Delete(files[i]);
+                        } catch (Exception ex) {
+                            this.log.Log(ex, "Delete failed mutli thread access");
+                        }
                     }
 
                     this.driver.Close();
@@ -292,7 +317,16 @@ namespace RipAndBurn
         }
 
         private void CreateButton_Click(object sender, EventArgs e) {
-
+            CreateCD cd = new CreateCD();
+            cd.Show();
+            cd.FormClosing += (object send, FormClosingEventArgs c_args) => {
+                DialogResult res = MessageBox.Show("Are you sure you want to close", "CLOSING", MessageBoxButtons.OKCancel);
+                if (res == DialogResult.OK) {
+                    this.Activate();
+                } else {
+                    c_args.Cancel = true;
+                }
+            };
         }
     }
 }
